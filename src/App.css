@@ -1,0 +1,5 @@
+@import "tailwindcss";
+
+.clip-curve {
+  clip-path: ellipse(60% 100% at 50% 100%);
+}
