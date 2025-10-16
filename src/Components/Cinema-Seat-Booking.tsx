@@ -124,57 +124,73 @@ const CinemaSeatBooking = ({
     return `${baseClass} cursor-pointer ${getColorClass(seat.color)}`;
   };
 
-  const handleSeatClick = (rowIdx: number, seatIdx: number) => {
-    const seat: Seat = seats[rowIdx][seatIdx]; // this is the seat where user clicked it
-    if (seat.status === "booked") return; // if already booked then we return it
+  const handleSeatClick = async (rowIdx: number, seatIdx: number) => {
+    const seat: Seat = seats[rowIdx][seatIdx]; // this is the seat user clicked
+    if (seat.status === "booked") return; // already booked
 
-    // get the left available count and right available count
+    // count available seats to the right
     let rightCount = 0;
     for (let i = seatIdx; i < layout.seatsPerRow; i++) {
-      if (seats[rowIdx][i].status === "booked" || seats[rowIdx][i].selected) {
+      if (seats[rowIdx][i].status === "booked" || rightCount === seatsToSelect)
         break;
-      } else {
-        rightCount++;
-      }
-    }
-    let leftCount = 0;
-    for (let i = seatIdx; i >= 0; i--) {
-      if (seats[rowIdx][i].status === "booked" || seats[rowIdx][i].selected) {
-        break;
-      } else {
-        leftCount++;
-      }
+      rightCount++;
     }
 
+    // count available seats to the left
+    let leftCount = 0;
+    for (let i = seatIdx; i >= 0; i--) {
+      if (seats[rowIdx][i].status === "booked" || leftCount === seatsToSelect)
+        break;
+      leftCount++;
+    }
+
+    // determine which seats to book
     let seatsToBook: Seat[] = [];
     if (rightCount >= leftCount) {
-      // we will priortize right direction if equal
-      const count = Math.min(seatsToSelect, rightCount);
-      seatsToBook = seats[rowIdx].slice(seatIdx, seatIdx + count);
+      seatsToBook = seats[rowIdx].slice(seatIdx, seatIdx + rightCount);
     } else {
-      const count = Math.min(seatsToSelect, leftCount);
-      seatsToBook = seats[rowIdx].slice(seatIdx - count + 1, seatIdx + 1);
+      seatsToBook = seats[rowIdx].slice(seatIdx - leftCount + 1, seatIdx + 1);
     }
+
+    // To Do: Need to fix i should not remove the previously selected seats which is currently in seatsToBook array
+
+    // deselect any previously selected seats
     setSeats((prev) =>
       prev.map((r) =>
         r.map((s) => {
-          if (s.selected) return { ...s, selected: false };
-          if (seatsToBook.find((sb) => sb.id === s.id)) {
-            return { ...s, selected: true };
+          if (s.selected && !seatsToBook.find((sb) => sb.id === s.id)) {
+            return { ...s, selected: false };
           }
           return s;
         })
       )
     );
-    setSelectedSeats(seatsToBook);
-    // this code is for adding multiple seats
-    // if (isCurrentlySelected) {
-    //   // if currently selected means : user reclicks on selected seats so remove the seat from selected seats
-    //   setSelectedSeats((prev) => prev.filter((s) => s.id !== seat.id));
-    // } else {
-    //   // prev not selected so add it now
-    //   setSelectedSeats((prev) => [...prev, seat]);
-    // }
+
+    setSelectedSeats((prev) =>
+      prev.filter((s) => seatsToBook.find((sb) => sb.id === s.id))
+    );
+
+    // animate selection one by one
+    for (let i = 0; i < seatsToBook.length; i++) {
+      const seatToSelect = seatsToBook[i];
+
+      if(selectedSeats.find((s) => s.id === seatToSelect.id)) continue;
+
+      // update seats state
+      setSeats((prev) =>
+        prev.map((r) =>
+          r.map((s) =>
+            s.id === seatToSelect.id ? { ...s, selected: true } : s
+          )
+        )
+      );
+
+      // update selectedSeats state
+      setSelectedSeats((prev) => [...prev, seatToSelect]);
+
+      // wait 200ms before selecting next seat
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
   };
 
   const renderSeatSection = (
